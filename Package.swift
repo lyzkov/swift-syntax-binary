@@ -16,7 +16,7 @@ let modules: [(name: String, depends: [String])] = [
   // about "duplicate copy commands being generated" when you are using more than one
   // macro defining package. They should really be just warnings. This is an SPM bug.
   // This may even have been fixed already with 5.10 or more recent 5.9 toolchains.
-  ("SwiftCompilerPlugin", []),//["SwiftSyntaxMacroExpansion", "SwiftSyntaxMacros", "SwiftSyntaxBuilder", "SwiftParserDiagnostics", "SwiftBasicFormat", "SwiftOperators", "SwiftParser", "SwiftDiagnostics", "SwiftSyntax", "SwiftSyntax509"]),
+  ("SwiftCompilerPlugin", ["SwiftCompilerPluginMessageHandling", "SwiftSyntaxMacroExpansion", "SwiftSyntaxMacros", "SwiftSyntaxBuilder", "SwiftParserDiagnostics", "SwiftBasicFormat", "SwiftOperators", "SwiftParser", "SwiftDiagnostics", "SwiftSyntax", "SwiftSyntax509"]),
   ("SwiftCompilerPluginMessageHandling", ["SwiftSyntaxMacroExpansion", "SwiftSyntaxMacros", "SwiftSyntaxBuilder", "SwiftParserDiagnostics", "SwiftBasicFormat", "SwiftOperators", "SwiftParser", "SwiftDiagnostics", "SwiftSyntax", "SwiftSyntax509"]),
   ("SwiftDiagnostics", ["SwiftSyntax509"]),
   ("SwiftIDEUtils", ["SwiftSyntax509"]),
@@ -63,9 +63,9 @@ let package = Package(
   targets: [
     // a target to patch the linker command for all macro plugins (see above)
     .target(
-      name: "InstantSyntax",
+      name: "InstantSyntax"//,
 //      dependencies: modules.map {Target.Dependency(stringLiteral: $0.name)},
-      linkerSettings: [.unsafeFlags(staticLink)]
+//      linkerSettings: [.unsafeFlags(staticLink)]
     ),
     .binaryTarget(
         name: "SwiftBasicFormat",
