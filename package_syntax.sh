@@ -15,9 +15,9 @@
 
 DD=./build
 TAG=509.1.1
-DEST=../InstantSyntax/$TAG
+DEST=../swift-syntax-binary/$TAG
 SOURCE=../swift-syntax
-XCODED=`xcode-select -p`
+CONFIG=release
 
 cd "$(dirname "$0")" &&
 if [ ! -d $SOURCE ]; then
@@ -32,30 +32,28 @@ git checkout $TAG &&
 # This seems to be the easiest way to regenerate the plugin static library.
 sed -e 's/, targets: /, type: .static, targets: /' Package.swift >P.swift &&
 mv -f P.swift Package.swift &&
-rm -rf .build ./build &&
-arch -arm64 $XCODED/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift build -c release &&
-arch -x86_64 $XCODED/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift build -c release &&
-lipo -create .build/*-apple-macosx/release/libSwiftCompilerPlugin.a -output $DEST/libSwiftSyntax.a &&
+# arch -arm64 swift build -c $CONFIG &&
+arch -x86_64 swift build -c $CONFIG &&
+mkdir -p $DEST &&
+lipo -create .build/*-apple-macosx/$CONFIG/libSwiftCompilerPlugin.a -output $DEST/libSwiftSyntax.a &&
 git checkout Package.swift &&
 
 # These patches required when using xcodebuild.
-git apply <<PATCH &&
+git apply -v <<PATCH &&
 diff --git a/Sources/SwiftSyntaxMacrosTestSupport/Assertions.swift b/Sources/SwiftSyntaxMacrosTestSupport/Assertions.swift
-index 0d138d55..2f7c1ffd 100644
+index 6ff8ba2b..5c776b2f 100644
 --- a/Sources/SwiftSyntaxMacrosTestSupport/Assertions.swift
 +++ b/Sources/SwiftSyntaxMacrosTestSupport/Assertions.swift
-@@ -20,6 +20,11 @@ import SwiftSyntaxMacros
- import SwiftSyntaxMacroExpansion
- import XCTest
-
+@@ -358,3 +358,9 @@ public func assertMacroExpansion(
+     }
+   }
+ }
++
 +func XCTFail(_ msg: String, file: StaticString = #file, line: UInt = #line) {
 +
 +}
 +func XCTAssertEqual<G: Equatable>(_ a: G, _ b: G, _ msg: String = "?", file: StaticString = #file, line: UInt = #line) {
 +}
- // MARK: - Note
-
- /// Describes a diagnostic note that tests expect to be created by a macro expansion.
 diff --git a/Sources/_SwiftSyntaxTestSupport/AssertEqualWithDiff.swift b/Sources/_SwiftSyntaxTestSupport/AssertEqualWithDiff.swift
 index 5cbdba15..1f51b91a 100644
 --- a/Sources/_SwiftSyntaxTestSupport/AssertEqualWithDiff.swift
@@ -85,8 +83,8 @@ index 5cbdba15..1f51b91a 100644
 PATCH
 
 if [ ! -d build ]; then
-  for sdk in macosx iphonesimulator iphoneos appletvsimulator appletvos xrsimulator xros; do
-    $XCODED/usr/bin/xcodebuild archive -target SwiftSyntax-all -sdk $sdk -project swift-syntax.xcodeproj || exit 1
+  for sdk in macosx iphonesimulator iphoneos; do
+    xcodebuild archive -target SwiftSyntax-all -sdk $sdk -project swift-syntax.xcodeproj BUILD_LIBRARY_FOR_DISTRIBUTION=YES SWIFT_SERIALIZE_DEBUGGING_OPTIONS=NO || exit 1
   done
 fi &&
 
@@ -94,12 +92,12 @@ for module in SwiftBasicFormat SwiftCompilerPlugin SwiftCompilerPluginMessageHan
 
     PLATFORMS=""
     for p in $DD/UninstalledProducts/*/$module.framework; do
-      codesign -f --timestamp -s "Developer ID Application" $p || exit 1
+#      codesign -f --timestamp -s "Apple Development: lyzkov@gmail.com (LUXWCD73JG)" $p || exit 1
       PLATFORMS="$PLATFORMS -framework $p"
     done
 
     rm -rf $DEST/$module.xcframework
-    $XCODED/usr/bin/xcodebuild -create-xcframework $PLATFORMS -output $DEST/$module.xcframework || exit 1
+    xcodebuild -create-xcframework $PLATFORMS -output $DEST/$module.xcframework || exit 1
 done &&
 
 cd $DEST &&
@@ -107,15 +105,16 @@ rm -f *.zip &&
 zip -9 libSwiftSyntax.a.zip libSwiftSyntax.a &&
 
 for f in *.xcframework; do
+#    codesign --timestamp -v --sign "Apple Development: lyzkov@gmail.com (LUXWCD73JG)" $f
     zip -r9 --symlinks "$f.zip"  "$f" >>../../zips.txt
-#    CHECKSUM=`swift package compute-checksum $f.zip`
-#    cat <<"HERE" | sed -e s/__NAME__/$f/g | sed -e s/.xcframework\",/\",/g | sed -e s/__CHECKSUM__/$CHECKSUM/g | tee -a ../Package.swift
-#    .binaryTarget(
-#        name: "__NAME__",
-#        url: repo + "__NAME__.zip",
-#        checksum: "__CHECKSUM__"
-#    ),
-#HERE
+    CHECKSUM=`swift package compute-checksum $f.zip`
+    cat <<"HERE" | sed -e s/__NAME__/$f/g | sed -e s/.xcframework\",/\",/g | sed -e s/__CHECKSUM__/$CHECKSUM/g | tee -a ../Package.swift
+    .binaryTarget(
+        name: "__NAME__",
+        url: repo + "__NAME__.zip",
+        checksum: "__CHECKSUM__"
+    ),
+HERE
 done
 
-echo "Build complete."
+echo "Build complete, edit Package.swift to update the checksums"
